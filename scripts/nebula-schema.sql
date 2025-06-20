@@ -38,6 +38,6 @@ CREATE EDGE IF NOT EXISTS related_to (
 );
 
 -- 创建索引以提高查询性能
-CREATE TAG INDEX IF NOT EXISTS wallet_address_index ON wallet(address);
-CREATE EDGE INDEX IF NOT EXISTS transaction_timestamp_index ON transaction(timestamp);
-CREATE EDGE INDEX IF NOT EXISTS related_score_index ON related_to(relationship_score);
+-- CREATE TAG INDEX IF NOT EXISTS wallet_address_index ON wallet(address);
+-- CREATE EDGE INDEX IF NOT EXISTS transaction_timestamp_index ON transaction(timestamp);
+-- CREATE EDGE INDEX IF NOT EXISTS related_score_index ON related_to(relationship_score);

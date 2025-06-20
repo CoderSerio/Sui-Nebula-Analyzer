@@ -1,78 +1,110 @@
-import type { NextRequest } from "next/server"
+import type { NextRequest } from "next/server";
+import NebulaHttpClient from "@/lib/nebula-http-client";
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const address = searchParams.get("address")
+  console.log("=== Graph Data API Called ===");
+
+  const searchParams = request.nextUrl.searchParams;
+  const address = searchParams.get("address");
+
+  console.log("Request address:", address);
 
   if (!address) {
-    return Response.json({ error: "Address parameter is required" }, { status: 400 })
+    console.log("Missing address parameter");
+    return Response.json(
+      { error: "Address parameter is required" },
+      { status: 400 }
+    );
   }
 
+  let nebulaClient: NebulaHttpClient | null = null;
+
   try {
-    // 模拟从 NebulaGraph 查询图数据
-    // 实际实现中应该执行 nGQL 查询
-    const mockGraphData = {
+    console.log("Creating NebulaHttpClient...");
+
+    // 检查环境变量
+    console.log("Environment variables:", {
+      NEBULA_HOST: process.env.NEBULA_HOST || "not set",
+      NEBULA_HTTP_PORT: process.env.NEBULA_HTTP_PORT || "not set",
+      NEBULA_USERNAME: process.env.NEBULA_USERNAME || "not set",
+      NEBULA_PASSWORD: process.env.NEBULA_PASSWORD ? "***" : "not set",
+      NEBULA_SPACE: process.env.NEBULA_SPACE || "not set",
+    });
+
+    nebulaClient = new NebulaHttpClient();
+    console.log("NebulaHttpClient created, getting address network...");
+
+    const graphData = await nebulaClient.getAddressNetwork(address, 2);
+    console.log("Graph data retrieved successfully");
+
+    // 如果没有找到数据，返回包含目标地址的基本结构
+    if (graphData.nodes.length === 0) {
+      console.log("No data found, returning empty structure");
+      return Response.json({
+        nodes: [
+          {
+            id: address,
+            address: address,
+            type: "target",
+            transactionCount: 0,
+            totalAmount: 0,
+          },
+        ],
+        links: [],
+      });
+    }
+
+    console.log(
+      "Returning graph data with",
+      graphData.nodes.length,
+      "nodes and",
+      graphData.links.length,
+      "links"
+    );
+    return Response.json(graphData);
+  } catch (error) {
+    console.error("=== Graph Data API Error ===");
+    console.error("Error type:", typeof error);
+    console.error("Error constructor:", error?.constructor?.name);
+    console.error(
+      "Error message:",
+      error instanceof Error ? error.message : String(error)
+    );
+    console.error(
+      "Error stack:",
+      error instanceof Error ? error.stack : "No stack trace"
+    );
+
+    // 尝试提取更多错误信息
+    if (error && typeof error === "object") {
+      console.error("Error object keys:", Object.keys(error));
+      console.error("Error object:", error);
+    }
+
+    // 如果查询失败，返回基本的目标地址节点而不是500错误
+    console.log("Returning fallback data due to error");
+    return Response.json({
       nodes: [
         {
           id: address,
           address: address,
           type: "target",
-          transactionCount: 25,
-          totalAmount: 1250.5,
-        },
-        {
-          id: "0x1234567890abcdef1234567890abcdef12345678",
-          address: "0x1234567890abcdef1234567890abcdef12345678",
-          type: "related",
-          transactionCount: 15,
-          totalAmount: 750.2,
-        },
-        {
-          id: "0xabcdef1234567890abcdef1234567890abcdef12",
-          address: "0xabcdef1234567890abcdef1234567890abcdef12",
-          type: "related",
-          transactionCount: 8,
-          totalAmount: 420.1,
-        },
-        {
-          id: "0x9876543210fedcba9876543210fedcba98765432",
-          address: "0x9876543210fedcba9876543210fedcba98765432",
-          type: "normal",
-          transactionCount: 3,
-          totalAmount: 150.0,
+          transactionCount: 0,
+          totalAmount: 0,
         },
       ],
-      links: [
-        {
-          source: address,
-          target: "0x1234567890abcdef1234567890abcdef12345678",
-          transactionCount: 12,
-          totalAmount: 600.0,
-        },
-        {
-          source: address,
-          target: "0xabcdef1234567890abcdef1234567890abcdef12",
-          transactionCount: 5,
-          totalAmount: 250.0,
-        },
-        {
-          source: "0x1234567890abcdef1234567890abcdef12345678",
-          target: "0xabcdef1234567890abcdef1234567890abcdef12",
-          transactionCount: 8,
-          totalAmount: 400.0,
-        },
-        {
-          source: address,
-          target: "0x9876543210fedcba9876543210fedcba98765432",
-          transactionCount: 2,
-          totalAmount: 100.0,
-        },
-      ],
+      links: [],
+      error: "Database connection failed, showing offline mode",
+    });
+  } finally {
+    // 确保客户端连接被正确关闭
+    if (nebulaClient) {
+      try {
+        await nebulaClient.close();
+        console.log("NebulaHttpClient connection closed");
+      } catch (closeError) {
+        console.error("Error closing NebulaHttpClient:", closeError);
+      }
     }
-
-    return Response.json(mockGraphData)
-  } catch (error) {
-    console.error("Failed to fetch graph data:", error)
-    return Response.json({ error: "Failed to fetch graph data" }, { status: 500 })
   }
 }
