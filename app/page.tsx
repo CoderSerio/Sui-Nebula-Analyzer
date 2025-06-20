@@ -1,59 +1,68 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2, Network, Search, Database, TrendingUp } from "lucide-react"
-import TransactionGraph from "@/components/transaction-graph"
-import AddressAnalysis from "@/components/address-analysis"
-import DataCollection from "@/components/data-collection"
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Network, Search, Database, TrendingUp } from "lucide-react";
+import TransactionGraph from "@/components/transaction-graph";
+import AddressAnalysis from "@/components/address-analysis";
+import DataCollection from "@/components/data-collection";
 
 interface Stats {
-  totalAddresses: number
-  totalTransactions: number
-  relatedGroups: number
-  lastUpdate: string
+  totalAddresses: number;
+  totalTransactions: number;
+  relatedGroups: number;
+  lastUpdate: string;
 }
 
 export default function SuiNebulaAnalyzer() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [searchAddress, setSearchAddress] = useState("")
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [searchAddress, setSearchAddress] = useState("");
 
   useEffect(() => {
-    fetchStats()
-  }, [])
+    fetchStats();
+  }, []);
 
   const fetchStats = async () => {
     try {
-      const response = await fetch("/api/stats")
+      const response = await fetch("/api/stats");
       if (response.ok) {
-        const data = await response.json()
-        setStats(data)
+        const data = await response.json();
+        setStats(data);
       }
     } catch (error) {
-      console.error("Failed to fetch stats:", error)
+      console.error("Failed to fetch stats:", error);
     }
-  }
+  };
 
   const handleSearch = async () => {
-    if (!searchAddress.trim()) return
-    setLoading(true)
+    if (!searchAddress.trim()) return;
+    setLoading(true);
     // 搜索逻辑将在组件间传递
-    setLoading(false)
-  }
+    setLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Sui 区块链交易关联分析系统</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Sui 区块链交易关联分析系统
+          </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            基于 NebulaGraph 的智能地址关联识别平台，通过交易模式分析发现潜在关联地址
+            基于 NebulaGraph
+            的智能地址关联识别平台，通过交易模式分析发现潜在关联地址
           </p>
         </div>
 
@@ -66,7 +75,9 @@ export default function SuiNebulaAnalyzer() {
                 <Network className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalAddresses.toLocaleString()}</div>
+                <div className="text-2xl font-bold">
+                  {stats.totalAddresses.toLocaleString()}
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -75,7 +86,9 @@ export default function SuiNebulaAnalyzer() {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalTransactions.toLocaleString()}</div>
+                <div className="text-2xl font-bold">
+                  {stats.totalTransactions.toLocaleString()}
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -93,7 +106,9 @@ export default function SuiNebulaAnalyzer() {
                 <Search className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-sm font-medium">{new Date(stats.lastUpdate).toLocaleString()}</div>
+                <div className="text-sm font-medium">
+                  {new Date(stats.lastUpdate).toLocaleString()}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -103,7 +118,9 @@ export default function SuiNebulaAnalyzer() {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>地址搜索分析</CardTitle>
-            <CardDescription>输入 Sui 地址来分析其交易网络和潜在关联地址</CardDescription>
+            <CardDescription>
+              输入 Sui 地址来分析其交易网络和潜在关联地址
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-4">
@@ -114,7 +131,11 @@ export default function SuiNebulaAnalyzer() {
                 className="flex-1"
               />
               <Button onClick={handleSearch} disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
                 分析
               </Button>
             </div>
@@ -123,10 +144,10 @@ export default function SuiNebulaAnalyzer() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="graph" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="graph">交易网络图谱</TabsTrigger>
             <TabsTrigger value="analysis">关联地址分析</TabsTrigger>
-            <TabsTrigger value="collection">数据采集</TabsTrigger>
+            {/* <TabsTrigger value="collection">数据采集</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="graph">
@@ -137,9 +158,10 @@ export default function SuiNebulaAnalyzer() {
             <AddressAnalysis searchAddress={searchAddress} />
           </TabsContent>
 
-          <TabsContent value="collection">
+          {/* 改为用脚本实现 */}
+          {/* <TabsContent value="collection">
             <DataCollection onStatsUpdate={fetchStats} />
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
 
         {/* Technology Stack Info */}
@@ -178,5 +200,5 @@ export default function SuiNebulaAnalyzer() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
