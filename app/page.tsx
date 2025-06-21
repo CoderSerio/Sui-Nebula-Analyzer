@@ -91,41 +91,6 @@ export default function SuiNebulaAnalyzer() {
             <AddressAnalysis searchAddress={searchAddress} />
           </TabsContent>
         </Tabs>
-
-        {/* Technology Stack Info */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>技术架构</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-2">
-                  数据源
-                </Badge>
-                <p className="text-sm">Sui GraphQL API</p>
-              </div>
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-2">
-                  图数据库
-                </Badge>
-                <p className="text-sm">NebulaGraph</p>
-              </div>
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-2">
-                  后端
-                </Badge>
-                <p className="text-sm">Next.js API Routes</p>
-              </div>
-              <div className="text-center">
-                <Badge variant="secondary" className="mb-2">
-                  前端
-                </Badge>
-                <p className="text-sm">React + D3.js</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

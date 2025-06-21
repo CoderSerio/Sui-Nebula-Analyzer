@@ -204,7 +204,6 @@ export default function RelatedAccounts() {
                     <TableHead>交易次数</TableHead>
                     <TableHead>账户余额</TableHead>
                     <TableHead>关联类型</TableHead>
-                    <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -280,38 +279,6 @@ export default function RelatedAccounts() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{account.type}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              window.open(
-                                `/?address=${account.addr1}`,
-                                "_blank"
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                            title="分析地址1"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              window.open(
-                                `/?address=${account.addr2}`,
-                                "_blank"
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                            title="分析地址2"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
