@@ -75,4 +75,8 @@ export default class GatewayClient {
   public async healthCheck(): Promise<any> {
     return this.request("/health");
   }
+
+  public async getAllRelationships(limit: number = 50): Promise<any> {
+    return this.request(`/all-relationships?limit=${limit}`);
+  }
 }

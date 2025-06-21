@@ -24,29 +24,18 @@ import {
 import { Loader2, RefreshCw, Filter, Copy, ExternalLink } from "lucide-react";
 
 interface RelatedAccount {
-  id: string;
-  address1: string;
-  address2: string;
-  transactionCount1: number;
-  transactionCount2: number;
-  totalAmount1: number;
-  totalAmount2: number;
+  addr1: string;
+  addr2: string;
   relationshipScore: number;
   commonTransactions: number;
-  relationAmount: number;
-  relationshipType: string;
-  firstInteraction: string | null;
-  lastInteraction: string | null;
+  amount: number;
+  type: string;
 }
 
 interface RelatedAccountsResponse {
-  data: RelatedAccount[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    hasMore: boolean;
-  };
+  totalFound: number;
+  relationships: RelatedAccount[];
+  timestamp: string;
   error?: string;
 }
 
@@ -71,9 +60,7 @@ export default function RelatedAccounts() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/related-accounts?page=${pageNum}&limit=50&minScore=${minScore}`
-      );
+      const response = await fetch(`/api/all-relationships?limit=50`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch related accounts");
@@ -86,14 +73,19 @@ export default function RelatedAccounts() {
         return;
       }
 
+      // 过滤数据根据最小分数
+      const filteredData = result.relationships.filter(
+        (account) => account.relationshipScore >= minScore
+      );
+
       if (reset) {
-        setData(result.data);
+        setData(filteredData);
       } else {
-        setData((prev) => [...prev, ...result.data]);
+        setData((prev) => [...prev, ...filteredData]);
       }
 
       setPage(pageNum);
-      setHasMore(result.pagination.hasMore);
+      setHasMore(false); // 目前一次性加载所有数据
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -216,18 +208,20 @@ export default function RelatedAccounts() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((account) => (
-                    <TableRow key={account.id}>
+                  {data.map((account, index) => (
+                    <TableRow
+                      key={`${account.addr1}-${account.addr2}-${index}`}
+                    >
                       <TableCell>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {formatAddress(account.address1)}
+                              {formatAddress(account.addr1)}
                             </code>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyAddress(account.address1)}
+                              onClick={() => copyAddress(account.addr1)}
                               className="h-6 w-6 p-0"
                             >
                               <Copy className="h-3 w-3" />
@@ -235,12 +229,12 @@ export default function RelatedAccounts() {
                           </div>
                           <div className="flex items-center gap-2">
                             <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {formatAddress(account.address2)}
+                              {formatAddress(account.addr2)}
                             </code>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyAddress(account.address2)}
+                              onClick={() => copyAddress(account.addr2)}
                               className="h-6 w-6 p-0"
                             >
                               <Copy className="h-3 w-3" />
@@ -264,28 +258,28 @@ export default function RelatedAccounts() {
                         <div className="text-sm font-medium">
                           {account.commonTransactions}
                         </div>
-                        {account.relationAmount > 0 && (
+                        {account.amount > 0 && (
                           <div className="text-xs text-gray-500">
-                            {account.relationAmount.toFixed(2)} SUI
+                            {account.amount.toFixed(2)} SUI
                           </div>
                         )}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-xs">
-                          <div>地址1: {account.transactionCount1}</div>
-                          <div>地址2: {account.transactionCount2}</div>
+                          <div>共同交易: {account.commonTransactions}</div>
+                          <div>总金额: {account.amount.toFixed(2)} SUI</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-xs">
-                          <div>{account.totalAmount1.toFixed(2)} SUI</div>
-                          <div>{account.totalAmount2.toFixed(2)} SUI</div>
+                          <div>
+                            关联强度: {account.relationshipScore.toFixed(3)}
+                          </div>
+                          <div>类型: {account.type}</div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {account.relationshipType}
-                        </Badge>
+                        <Badge variant="outline">{account.type}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -294,7 +288,7 @@ export default function RelatedAccounts() {
                             size="sm"
                             onClick={() =>
                               window.open(
-                                `/?address=${account.address1}`,
+                                `/?address=${account.addr1}`,
                                 "_blank"
                               )
                             }
@@ -308,7 +302,7 @@ export default function RelatedAccounts() {
                             size="sm"
                             onClick={() =>
                               window.open(
-                                `/?address=${account.address2}`,
+                                `/?address=${account.addr2}`,
                                 "_blank"
                               )
                             }

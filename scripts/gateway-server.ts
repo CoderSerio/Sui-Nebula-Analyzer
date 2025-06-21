@@ -19,10 +19,10 @@ const nebulaConfig = {
   userName: process.env.NEBULA_USERNAME || "root",
   password: process.env.NEBULA_PASSWORD || "nebula",
   space: process.env.NEBULA_SPACE || "sui_analysis",
-  poolSize: 5,
-  bufferSize: 2000,
-  executeTimeout: 15000,
-  pingInterval: 60000,
+  poolSize: 2,
+  bufferSize: 1000,
+  executeTimeout: 60000,
+  pingInterval: 30000,
 };
 
 console.log("Nebula Gateway Server config:", {
@@ -212,6 +212,36 @@ app.get("/related-accounts", async (req: any, res: any) => {
     });
   } catch (error) {
     console.error("Related accounts query failed:", error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// 所有关联账户对列表端点
+app.get("/all-relationships", async (req: any, res: any) => {
+  try {
+    const limit = parseInt((req.query.limit as string) || "50");
+
+    console.log("Getting all relationship pairs...");
+
+    // 获取所有关联关系对，使用最简单的查询
+    const query = `USE sui_analysis; MATCH (a:wallet)-[r:related_to]-(b:wallet) RETURN a.wallet.address AS addr1, b.wallet.address AS addr2, r.relationship_score AS score, r.common_transactions AS common_tx LIMIT ${limit}`;
+
+    const result = await nebulaClient.execute(query);
+    const relationships = processAllRelationshipsResult(result);
+
+    // 按关联强度排序
+    relationships.sort((a, b) => b.relationshipScore - a.relationshipScore);
+
+    res.json({
+      totalFound: relationships.length,
+      relationships: relationships,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("All relationships query failed:", error);
     res.status(500).json({
       error: error instanceof Error ? error.message : String(error),
       timestamp: new Date().toISOString(),
@@ -504,6 +534,43 @@ function processSimpleRelatedAccountsResult(result: any) {
   }
 
   return accounts;
+}
+
+function processAllRelationshipsResult(result: any) {
+  const relationships: Array<{
+    addr1: string;
+    addr2: string;
+    relationshipScore: number;
+    commonTransactions: number;
+    amount: number;
+    type: string;
+  }> = [];
+
+  if (!result?.data) {
+    return relationships;
+  }
+
+  const data = result.data;
+
+  if (
+    data.addr1 &&
+    data.addr2 &&
+    Array.isArray(data.addr1) &&
+    Array.isArray(data.addr2)
+  ) {
+    for (let i = 0; i < data.addr1.length; i++) {
+      relationships.push({
+        addr1: data.addr1[i],
+        addr2: data.addr2[i],
+        relationshipScore: data.score?.[i] || 0,
+        commonTransactions: data.common_tx?.[i] || 0,
+        amount: 0, // 简化版本不返回amount
+        type: "unknown", // 简化版本设为默认值
+      });
+    }
+  }
+
+  return relationships;
 }
 
 // 启动服务器
