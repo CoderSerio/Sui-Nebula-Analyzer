@@ -34,8 +34,32 @@ export async function GET(request: NextRequest) {
     nebulaClient = new NebulaHttpClient();
     console.log("NebulaHttpClient created, getting address analysis...");
 
-    const analysisResult = await nebulaClient.getAddressAnalysis(address);
-    console.log("Analysis data retrieved successfully");
+    // 查询地址的详细分析信息
+    const query = `
+      MATCH (target:wallet {address: "${address}"})
+      OPTIONAL MATCH (target)-[r:related_to]-(related:wallet)
+      RETURN target.address AS address,
+             target.transaction_count AS tx_count,
+             target.total_amount AS total_amount,
+             target.first_seen AS first_seen,
+             target.last_seen AS last_seen,
+             target.is_contract AS is_contract,
+             collect(DISTINCT {
+               address: related.address,
+               score: r.relationship_score,
+               common_tx: r.common_transactions,
+               relation_amount: r.total_amount,
+               type: r.relationship_type,
+               first_interaction: r.first_interaction,
+               last_interaction: r.last_interaction
+             }) AS relationships
+    `;
+
+    console.log("Executing address analysis query...");
+    const result = await nebulaClient.executeQuery(query);
+
+    const analysisResult = processAnalysisResult(result, address);
+    console.log("Analysis data processed successfully");
 
     return Response.json(analysisResult);
   } catch (error) {
@@ -77,4 +101,65 @@ export async function GET(request: NextRequest) {
       }
     }
   }
+}
+
+// 处理地址分析查询结果
+function processAnalysisResult(result: any, targetAddress: string) {
+  try {
+    if (result && result.rows && result.rows.length > 0) {
+      const row = result.rows[0];
+      const address = row[0];
+      const txCount = row[1] || 0;
+      const totalAmount = row[2] || 0;
+      const firstSeen = row[3] || null;
+      const lastSeen = row[4] || null;
+      const isContract = row[5] || false;
+      const relationships = row[6] || [];
+
+      // 过滤和处理关联地址
+      const relatedAddresses = relationships
+        .filter((rel: any) => rel.address && rel.address !== address)
+        .map((rel: any) => ({
+          address: rel.address,
+          relationshipScore: rel.score || 0,
+          commonTransactions: rel.common_tx || 0,
+          relationAmount: rel.relation_amount || 0,
+          relationshipType: rel.type || "unknown",
+          firstInteraction: rel.first_interaction || null,
+          lastInteraction: rel.last_interaction || null,
+        }))
+        .sort((a: any, b: any) => b.relationshipScore - a.relationshipScore);
+
+      return {
+        targetAddress: address,
+        analysisTime: new Date().toISOString(),
+        addressInfo: {
+          transactionCount: txCount,
+          totalAmount: totalAmount,
+          firstSeen: firstSeen,
+          lastSeen: lastSeen,
+          isContract: isContract,
+        },
+        totalRelationships: relatedAddresses.length,
+        relatedAddresses: relatedAddresses,
+      };
+    }
+  } catch (error) {
+    console.error("Error processing analysis result:", error);
+  }
+
+  // 返回默认结果
+  return {
+    targetAddress: targetAddress,
+    analysisTime: new Date().toISOString(),
+    addressInfo: {
+      transactionCount: 0,
+      totalAmount: 0,
+      firstSeen: null,
+      lastSeen: null,
+      isContract: false,
+    },
+    totalRelationships: 0,
+    relatedAddresses: [],
+  };
 }

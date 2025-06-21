@@ -34,8 +34,29 @@ export async function GET(request: NextRequest) {
     nebulaClient = new NebulaHttpClient();
     console.log("NebulaHttpClient created, getting address network...");
 
-    const graphData = await nebulaClient.getAddressNetwork(address, 2);
-    console.log("Graph data retrieved successfully");
+    // 查询目标地址及其相关的交易网络
+    const query = `
+      MATCH (center:wallet {address: "${address}"})
+      OPTIONAL MATCH (center)-[r:transaction]-(connected:wallet)
+      RETURN center.address AS center_address,
+             center.transaction_count AS center_tx_count,
+             center.total_amount AS center_amount,
+             collect(DISTINCT {
+               address: connected.address,
+               tx_count: connected.transaction_count,
+               amount: connected.total_amount,
+               edge_amount: r.amount,
+               tx_hash: r.tx_hash,
+               timestamp: r.timestamp
+             }) AS connections
+      LIMIT 100
+    `;
+
+    console.log("Executing graph query...");
+    const result = await nebulaClient.executeQuery(query);
+
+    const graphData = processGraphResult(result, address);
+    console.log("Graph data processed successfully");
 
     // 如果没有找到数据，返回包含目标地址的基本结构
     if (graphData.nodes.length === 0) {
@@ -107,4 +128,59 @@ export async function GET(request: NextRequest) {
       }
     }
   }
+}
+
+// 处理图数据查询结果
+function processGraphResult(result: any, targetAddress: string) {
+  const nodes: any[] = [];
+  const links: any[] = [];
+
+  try {
+    if (result && result.rows && result.rows.length > 0) {
+      const row = result.rows[0];
+      const centerAddress = row[0];
+      const centerTxCount = row[1] || 0;
+      const centerAmount = row[2] || 0;
+      const connections = row[3] || [];
+
+      // 添加中心节点
+      nodes.push({
+        id: centerAddress,
+        address: centerAddress,
+        type: "target",
+        transactionCount: centerTxCount,
+        totalAmount: centerAmount,
+      });
+
+      // 处理连接的节点和边
+      connections.forEach((conn: any, index: number) => {
+        if (conn.address && conn.address !== centerAddress) {
+          // 添加连接的节点
+          const nodeId = conn.address;
+          if (!nodes.find((n) => n.id === nodeId)) {
+            nodes.push({
+              id: nodeId,
+              address: conn.address,
+              type: "connected",
+              transactionCount: conn.tx_count || 0,
+              totalAmount: conn.amount || 0,
+            });
+          }
+
+          // 添加边
+          links.push({
+            source: centerAddress,
+            target: nodeId,
+            amount: conn.edge_amount || 0,
+            txHash: conn.tx_hash || "",
+            timestamp: conn.timestamp || null,
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error processing graph result:", error);
+  }
+
+  return { nodes, links };
 }
