@@ -3,11 +3,11 @@ import fetch from "node-fetch";
 
 /**
  * Thin wrapper around NebulaGraph HTTP Gateway (vesoft/nebula-http-gateway)
- *   POST /api/db/connect   -> returns { code, session, message }
+ *   POST /api/db/connect   -> returns { code, data (session), message }
  *   POST /api/db/exec      -> returns { code, data, message }
  *   POST /api/db/disconnect -> returns { code, message }
  *
- * Works on Apple-silicon Macs by forcing x86 image in docker-compose.
+ * Works on Apple‑silicon Macs by forcing x86 image in docker‑compose.
  */
 export interface NebulaConfig {
   host: string;
@@ -23,7 +23,7 @@ export default class NebulaHttpClient {
 
   constructor(partial: Partial<NebulaConfig> = {}) {
     this.cfg = {
-      host: process.env.NEBULA_HTTP_HOST || "localhost",
+      host: process.env.NEBULA_HOST || "localhost",
       port: Number(process.env.NEBULA_HTTP_PORT) || 8090,
       username: process.env.NEBULA_USERNAME || "root",
       password: process.env.NEBULA_PASSWORD || "nebula",
@@ -35,7 +35,7 @@ export default class NebulaHttpClient {
   }
 
   /* ------------------------------------------------------------------ */
-  /*  Low-level session helpers                                         */
+  /*  Low‑level session helpers                                         */
   /* ------------------------------------------------------------------ */
 
   /** Ensure we have a valid session before any exec */
@@ -54,19 +54,19 @@ export default class NebulaHttpClient {
       body: JSON.stringify({
         username: this.cfg.username,
         password: this.cfg.password,
-        address: "graphd", // default graphd container name inside compose network
+        address: "nebula-docker-compose-graphd-1", // 匹配HTTP Gateway的实际配置
         port: 9669,
       }),
     });
 
     if (!res.ok) throw new Error(`Gateway login HTTP ${res.status}`);
 
-    const json = await res.json();
-    if (json.code !== 0 || !json.session) {
+    const json = (await res.json()) as any;
+    if (json.code !== 0 || !json.data) {
       throw new Error(`Gateway login failed: ${json.message || json.code}`);
     }
-    this.session = json.session;
-    console.log("Nebula session established", this.session);
+    this.session = json.data;
+    console.log("Nebula session established:", this.session);
   }
 
   /** POST /api/db/disconnect */
@@ -77,7 +77,7 @@ export default class NebulaHttpClient {
       await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session: this.session }),
+        body: JSON.stringify({ sessionId: this.session }),
       });
     } finally {
       this.session = null;
@@ -93,7 +93,7 @@ export default class NebulaHttpClient {
 
     const url = `http://${this.cfg.host}:${this.cfg.port}/api/db/exec`;
     const payload = {
-      session: this.session,
+      sessionId: this.session,
       space: this.cfg.space,
       stmt,
     };
@@ -106,10 +106,10 @@ export default class NebulaHttpClient {
 
     // session 过期自动重登重试一次
     if (res.status === 401 || res.status === 403) {
-      console.warn("Session expired – re-login");
+      console.warn("Session expired – re‑login");
       this.session = null;
       await this.ensureSession();
-      payload.session = this.session;
+      payload.sessionId = this.session;
       res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -118,7 +118,7 @@ export default class NebulaHttpClient {
     }
 
     if (!res.ok) throw new Error(`Query HTTP ${res.status}`);
-    const json = await res.json();
+    const json = (await res.json()) as any;
     if (json.code !== 0)
       throw new Error(`Nebula error ${json.code}: ${json.message}`);
     return json.data; // { column_names, rows }
