@@ -19,9 +19,9 @@ graph LR
 
 > 这是因为 Nebula 的 HTTP API 需要由 Nebula Gateway 提供
 > 
-> 而 Nebula Gateway 对 Next.js Server 的兼容不太友好（难以使用原生模块）
+> 而 Nebula Gateway SDK 对 Next.js Server 的兼容不太友好（难以使用原生模块）
 > 
-> 所以这里使用了一个纯粹的 Node.js 服务来连接并访问 Nebula Gateway
+> 所以这里使用了一个纯粹的 Node.js 服务以使用该 SDK 访问 Nebula Gateway
 
 
 ## 功能概览
