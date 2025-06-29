@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Settings } from "lucide-react";
 import TransactionGraph from "@/components/transaction-graph";
 import AddressAnalysis from "@/components/address-analysis";
 import RelatedAccounts from "@/components/related-accounts";
@@ -32,7 +33,7 @@ export default function SuiNebulaAnalyzer() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="relative text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Sui 区块链交易关联分析系统
           </h1>
@@ -40,6 +41,15 @@ export default function SuiNebulaAnalyzer() {
             基于 NebulaGraph
             的智能地址关联识别平台，通过交易模式分析发现潜在关联地址
           </p>
+          {/* 设置按钮 */}
+          <div className="absolute top-0 right-0">
+            <Link href="/admin/data-management">
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                数据管理
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Search Bar */}
