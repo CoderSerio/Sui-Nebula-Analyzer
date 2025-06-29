@@ -13,14 +13,78 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Search, Settings } from "lucide-react";
+import {
+  Loader2,
+  Search,
+  Settings,
+  Users,
+  Database,
+  GitBranch,
+  RefreshCw,
+} from "lucide-react";
 import TransactionGraph from "@/components/transaction-graph";
 import AddressAnalysis from "@/components/address-analysis";
 import RelatedAccounts from "@/components/related-accounts";
 
+interface DataStats {
+  totalWallets: number;
+  totalTransactions: number;
+  totalRelationships: number;
+  lastUpdate: string;
+}
+
 export default function SuiNebulaAnalyzer() {
   const [loading, setLoading] = useState(false);
   const [searchAddress, setSearchAddress] = useState("");
+  const [stats, setStats] = useState<DataStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchStats = async () => {
+    try {
+      setStatsLoading(true);
+
+      // 获取统计数据
+      const queries = [
+        "USE sui_analysis; MATCH (n:wallet) RETURN count(n) as count",
+        "USE sui_analysis; MATCH ()-[e:transaction]->() RETURN count(e) as count",
+        "USE sui_analysis; MATCH ()-[r:related_to]->() RETURN count(r) as count",
+      ];
+
+      const results = await Promise.all(
+        queries.map(async (query) => {
+          const response = await fetch("/api/execute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query }),
+          });
+          const result = await response.json();
+          return result.success ? result.data.data.count?.[0] || 0 : 0;
+        })
+      );
+
+      setStats({
+        totalWallets: results[0],
+        totalTransactions: results[1],
+        totalRelationships: results[2],
+        lastUpdate: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("获取统计数据失败:", err);
+      // 设置默认值，避免显示错误
+      setStats({
+        totalWallets: 0,
+        totalTransactions: 0,
+        totalRelationships: 0,
+        lastUpdate: new Date().toISOString(),
+      });
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   const handleSearch = async () => {
     if (!searchAddress.trim()) return;
@@ -50,6 +114,49 @@ export default function SuiNebulaAnalyzer() {
               </Button>
             </Link>
           </div>
+        </div>
+
+        {/* 数据统计概览 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <Users className="h-8 w-8 text-blue-500" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {stats?.totalWallets || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">钱包总数</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <Database className="h-8 w-8 text-green-500" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {stats?.totalTransactions || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">交易总数</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <GitBranch className="h-8 w-8 text-orange-500" />
+                <div>
+                  <p className="text-2xl font-bold">
+                    {stats?.totalRelationships || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">关联关系</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search Bar */}

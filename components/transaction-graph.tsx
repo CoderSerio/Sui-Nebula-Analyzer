@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, RefreshCw, Download } from "lucide-react";
 import * as d3 from "d3";
+import { calculateBasicRelationshipScore } from "@/lib/relationship-algorithms";
 
 interface Node {
   id: string;
@@ -27,6 +28,7 @@ interface Link {
   target: string;
   transactionCount: number;
   totalAmount: number;
+  relationshipScore?: number;
 }
 
 interface GraphData {
@@ -63,8 +65,8 @@ export default function TransactionGraph({
     setError(null);
 
     try {
-      // 构造中心节点查询
-      const centerQuery = `USE sui_analysis; MATCH (center:wallet) WHERE id(center) == hash("${searchAddress}") RETURN center.wallet.address AS center_address, center.wallet.transaction_count AS center_tx_count, center.wallet.total_amount AS center_amount`;
+      // 构造中心节点查询 - 移除hash()函数，直接使用地址字符串
+      const centerQuery = `USE sui_analysis; MATCH (center:wallet) WHERE id(center) == "${searchAddress}" RETURN center.wallet.address AS center_address, center.wallet.transaction_count AS center_tx_count, center.wallet.total_amount AS center_amount`;
 
       const centerResponse = await fetch("/api/execute", {
         method: "POST",
@@ -88,8 +90,8 @@ export default function TransactionGraph({
         return;
       }
 
-      // 构造连接节点查询
-      const connectionsQuery = `USE sui_analysis; MATCH (center:wallet)-[r:transaction]-(connected:wallet) WHERE id(center) == hash("${searchAddress}") RETURN connected.wallet.address AS connected_address, connected.wallet.transaction_count AS connected_tx_count, connected.wallet.total_amount AS connected_amount, r.amount AS edge_amount LIMIT 50`;
+      // 构造连接节点查询 - 使用transaction边和正确的字段名
+      const connectionsQuery = `USE sui_analysis; MATCH (center:wallet)-[r:transaction]-(connected:wallet) WHERE id(center) == "${searchAddress}" RETURN connected.wallet.address AS connected_address, connected.wallet.transaction_count AS connected_tx_count, connected.wallet.total_amount AS connected_amount, r.amount AS edge_amount, r.tx_timestamp AS tx_time LIMIT 50`;
 
       const connectionsResponse = await fetch("/api/execute", {
         method: "POST",
@@ -138,11 +140,20 @@ export default function TransactionGraph({
                 totalAmount: connectionsData.connected_amount?.[index] || 0,
               });
 
+              // 使用关联性算法计算关联分数
+              const relationshipScore = calculateBasicRelationshipScore(
+                1, // 简化为1次交易，实际中可以统计多次
+                connectionsData.edge_amount?.[index] || 0,
+                30, // 默认30天时间跨度
+                1 // 默认频率
+              );
+
               links.push({
                 source: centerData.center_address[0],
                 target: connAddress,
-                transactionCount: 1, // 简化为1次交易
+                transactionCount: 1,
                 totalAmount: connectionsData.edge_amount?.[index] || 0,
+                relationshipScore,
               });
             }
           );
@@ -181,16 +192,24 @@ export default function TransactionGraph({
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2));
 
-    // 绘制连线
+    // 绘制连线 - 根据关联强度调整样式
     const link = svg
       .append("g")
       .selectAll("line")
       .data(graphData.links)
       .enter()
       .append("line")
-      .attr("stroke", "#999")
+      .attr("stroke", (d) => {
+        const score = d.relationshipScore || 0;
+        if (score >= 0.7) return "#ef4444"; // 强关联红色
+        if (score >= 0.4) return "#f59e0b"; // 中关联橙色
+        return "#999"; // 弱关联灰色
+      })
       .attr("stroke-opacity", 0.6)
-      .attr("stroke-width", (d) => Math.sqrt(d.transactionCount));
+      .attr("stroke-width", (d) => {
+        const score = d.relationshipScore || 0;
+        return Math.max(1, score * 4); // 根据关联强度调整线宽
+      });
 
     // 绘制节点
     const node = svg
@@ -230,7 +249,7 @@ export default function TransactionGraph({
       .attr("dx", 12)
       .attr("dy", 4);
 
-    // 添加工具提示
+    // 添加工具提示 - 包含关联信息
     node
       .append("title")
       .text(
@@ -238,6 +257,16 @@ export default function TransactionGraph({
           `地址: ${d.address}\n交易次数: ${
             d.transactionCount
           }\n总金额: ${d.totalAmount.toFixed(2)} SUI`
+      );
+
+    // 为连线添加工具提示
+    link
+      .append("title")
+      .text(
+        (d: any) =>
+          `关联强度: ${((d.relationshipScore || 0) * 100).toFixed(
+            1
+          )}%\n交易金额: ${d.totalAmount.toFixed(2)} SUI`
       );
 
     simulation.on("tick", () => {
@@ -301,6 +330,10 @@ export default function TransactionGraph({
             <CardTitle>交易网络图谱</CardTitle>
             <CardDescription>
               可视化展示地址间的交易关系网络，红色为目标地址，橙色为关联地址
+              <br />
+              <small className="text-gray-500">
+                连线颜色和粗细表示关联强度：红色(强)、橙色(中)、灰色(弱)
+              </small>
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -369,6 +402,14 @@ export default function TransactionGraph({
               <Badge variant="secondary">
                 关联地址:{" "}
                 {graphData.nodes.filter((n) => n.type === "related").length}
+              </Badge>
+              <Badge variant="secondary">
+                强关联:{" "}
+                {
+                  graphData.links.filter(
+                    (l) => (l.relationshipScore || 0) >= 0.7
+                  ).length
+                }
               </Badge>
             </div>
 

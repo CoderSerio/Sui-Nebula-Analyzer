@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 
 interface DataStats {
   totalWallets: number;
@@ -165,6 +166,7 @@ export default function DataManagementPage() {
   const DataCollection = () => {
     const [checkpointCount, setCheckpointCount] = useState(10);
     const [rpcUrl, setRpcUrl] = useState("https://fullnode.mainnet.sui.io:443");
+    const [useEnhancedScript, setUseEnhancedScript] = useState(false);
     const [isCollecting, setIsCollecting] = useState(false);
     const [collectionResult, setCollectionResult] = useState<any>(null);
     const [progress, setProgress] = useState(0);
@@ -185,6 +187,7 @@ export default function DataManagementPage() {
           body: JSON.stringify({
             checkpointCount,
             rpcUrl,
+            useEnhancedScript,
           }),
         });
 
@@ -226,10 +229,10 @@ export default function DataManagementPage() {
                   timestamp: message.timestamp,
                 });
                 setProgress(100);
-                // 刷新数据统计
-                setTimeout(() => {
-                  fetchStats();
-                }, 1000);
+                // 延迟刷新数据统计，让用户先看到结果
+                // setTimeout(() => {
+                //   fetchStats();
+                // }, 5000); // 5秒后再刷新，让用户有时间查看日志
               }
 
               // 处理错误
@@ -309,6 +312,42 @@ export default function DataManagementPage() {
                 <p className="text-xs text-gray-500">Sui 全节点RPC地址</p>
               </div>
             </div>
+
+            {/* 增强功能选项 */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <Label htmlFor="enhanced-script">增强版数据采集</Label>
+                  <p className="text-xs text-gray-500">
+                    启用后将采集账户余额、对象数量等额外信息（会增加采集时间）
+                  </p>
+                </div>
+                <Switch
+                  id="enhanced-script"
+                  checked={useEnhancedScript}
+                  onCheckedChange={setUseEnhancedScript}
+                  disabled={isCollecting}
+                />
+              </div>
+
+              {useEnhancedScript && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="text-sm text-blue-700">
+                    <strong>增强版功能包括：</strong>
+                    <ul className="mt-2 space-y-1 text-xs">
+                      <li>• 账户SUI余额查询</li>
+                      <li>• 拥有对象数量统计</li>
+                      <li>• 合约地址识别</li>
+                      <li>• 改进的关联性评分算法</li>
+                      <li>• 更多交易类型分析</li>
+                    </ul>
+                    <p className="mt-2 text-xs text-blue-600">
+                      ⚠️ 注意：增强版功能会显著增加采集时间
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -328,7 +367,9 @@ export default function DataManagementPage() {
                 <div className="text-yellow-600 mt-0.5">⚠️</div>
                 <div>
                   <ul className="text-sm text-yellow-700 mt-1 space-y-1">
-                    <li>数据采集将清空所有现有数据</li>
+                    <li>
+                      数据采集将清空所有现有数据，采集过程中请不要退出页面
+                    </li>
                   </ul>
                 </div>
               </div>
@@ -457,12 +498,20 @@ export default function DataManagementPage() {
               <p className="text-gray-600">Sui 链上数据采集和管理</p>
             </div>
           </div>
-          <Button onClick={fetchStats} disabled={loading}>
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
-            />
-            刷新
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={fetchStats} disabled={loading}>
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
+              />
+              刷新
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.open("/api/debug-db", "_blank")}
+            >
+              🔍 调试
+            </Button>
+          </div>
         </div>
 
         {/* 错误提示 */}
