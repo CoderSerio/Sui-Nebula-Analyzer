@@ -10,7 +10,7 @@
     "lint": "next lint",
     "gateway": "node scripts/gateway-server.ts",
     "gateway:dev": "nodemon scripts/gateway-server.ts",
-    "start:full": "concurrently \"npm run gateway\" \"npm run dev\"",
+    "start:all": "concurrently \"npm run gateway\" \"npm run dev\"",
     "test:api": "node scripts/test-api.js",
     "test:gateway": "node scripts/test-new-client.js"
   },
