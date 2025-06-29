@@ -56,14 +56,77 @@ export default function AddressAnalysis({
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/address-analysis?address=${encodeURIComponent(searchAddress)}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to perform analysis");
+      // 获取地址分析数据
+      const analysisQuery = `USE sui_analysis; MATCH (target:wallet) WHERE id(target) == hash("${searchAddress}") RETURN target.wallet.address AS address, target.wallet.transaction_count AS tx_count, target.wallet.total_amount AS total_amount, target.wallet.first_seen AS first_seen, target.wallet.last_seen AS last_seen, target.wallet.is_contract AS is_contract`;
+
+      const analysisResponse = await fetch("/api/execute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: analysisQuery }),
+      });
+
+      if (!analysisResponse.ok) {
+        throw new Error("Failed to get address analysis");
       }
-      const data = await response.json();
-      setAnalysisResult(data);
+
+      const analysisResult = await analysisResponse.json();
+
+      if (!analysisResult.success) {
+        throw new Error(analysisResult.error || "Address analysis failed");
+      }
+
+      // 获取相关账户数据
+      const relatedQuery = `USE sui_analysis; MATCH (target:wallet)-[r:related_to]-(related:wallet) WHERE id(target) == hash("${searchAddress}") RETURN related.wallet.address AS address, r.relationship_score AS score, r.common_transactions AS common_tx, r.total_amount AS total_amount, r.relationship_type AS type LIMIT 20`;
+
+      const relatedResponse = await fetch("/api/execute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: relatedQuery }),
+      });
+
+      if (!relatedResponse.ok) {
+        throw new Error("Failed to get related accounts");
+      }
+
+      const relatedResult = await relatedResponse.json();
+
+      // 处理地址分析数据
+      const analysisData = analysisResult.data.data;
+      const relatedData = relatedResult.data.data;
+
+      // 处理相关地址数据
+      const relatedAddresses: RelatedAddress[] = [];
+      if (relatedData?.address && Array.isArray(relatedData.address)) {
+        for (let i = 0; i < relatedData.address.length; i++) {
+          const score = relatedData.score?.[i] || 0;
+          relatedAddresses.push({
+            address: relatedData.address[i],
+            relationshipScore: score,
+            commonTransactions: relatedData.common_tx?.[i] || 0,
+            totalAmount: relatedData.total_amount?.[i] || 0,
+            firstInteraction: new Date().toISOString(), // 默认值
+            lastInteraction: new Date().toISOString(), // 默认值
+            relationshipType:
+              score > 0.8 ? "strong" : score > 0.5 ? "medium" : "weak",
+          });
+        }
+      }
+
+      // 转换数据格式以匹配前端期望
+      const finalResult = {
+        targetAddress: analysisData?.address?.[0] || searchAddress,
+        relatedAddresses: relatedAddresses,
+        analysisTime: new Date().toISOString(),
+        totalRelationships: relatedAddresses.length,
+        // 保留原始数据用于调试
+        rawData: analysisData,
+      };
+
+      setAnalysisResult(finalResult);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -170,7 +233,7 @@ export default function AddressAnalysis({
             </div>
 
             {/* 目标地址信息 */}
-            <Card>
+            {/* <Card>
               <CardHeader>
                 <CardTitle className="text-lg">目标地址</CardTitle>
               </CardHeader>
@@ -204,105 +267,98 @@ export default function AddressAnalysis({
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
 
             {/* 关联地址列表 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">关联地址详情</CardTitle>
-                <CardDescription>
-                  按关联强度排序，显示详细的关联分析结果
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {analysisResult.relatedAddresses?.map((address, index) => (
-                    <div
-                      key={address.address}
-                      className="border rounded-lg p-4"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-medium text-gray-500">
-                            #{index + 1}
-                          </span>
-                          {getRelationshipBadge(address.relationshipType)}
-                          <span className="text-sm font-medium">
-                            关联度: {address.relationshipScore}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyToClipboard(address.address)}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              window.open(
-                                `https://suiscan.xyz/mainnet/account/${address.address}`,
-                                "_blank"
-                              )
-                            }
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
+            <CardTitle className="text-lg">关联地址详情</CardTitle>
+            <CardDescription>
+              按关联强度排序，显示详细的关联分析结果
+            </CardDescription>
+            <CardContent className="p-0">
+              <div>
+                {analysisResult.relatedAddresses?.map((address, index) => (
+                  <div key={address.address} className="border rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-500">
+                          #{index + 1}
+                        </span>
+                        {getRelationshipBadge(address.relationshipType)}
+                        <span className="text-sm font-medium">
+                          关联度: {address.relationshipScore}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(address.address)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            window.open(
+                              `https://suiscan.xyz/mainnet/account/${address.address}`,
+                              "_blank"
+                            )
+                          }
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mb-3">
+                      <code className="bg-gray-100 px-2 py-1 rounded text-sm">
+                        {address.address}
+                      </code>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">共同交易:</span>
+                        <div className="font-medium">
+                          {address.commonTransactions} 次
                         </div>
                       </div>
-
-                      <div className="mb-3">
-                        <code className="bg-gray-100 px-2 py-1 rounded text-sm">
-                          {address.address}
-                        </code>
+                      <div>
+                        <span className="text-gray-500">总金额:</span>
+                        <div className="font-medium">
+                          {address.totalAmount.toFixed(2)} SUI
+                        </div>
                       </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">共同交易:</span>
-                          <div className="font-medium">
-                            {address.commonTransactions} 次
-                          </div>
+                      <div>
+                        <span className="text-gray-500">首次交互:</span>
+                        <div className="font-medium">
+                          {new Date(
+                            address.firstInteraction
+                          ).toLocaleDateString()}
                         </div>
-                        <div>
-                          <span className="text-gray-500">总金额:</span>
-                          <div className="font-medium">
-                            {address.totalAmount.toFixed(2)} SUI
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">首次交互:</span>
-                          <div className="font-medium">
-                            {new Date(
-                              address.firstInteraction
-                            ).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">最近交互:</span>
-                          <div className="font-medium">
-                            {new Date(
-                              address.lastInteraction
-                            ).toLocaleDateString()}
-                          </div>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">最近交互:</span>
+                        <div className="font-medium">
+                          {new Date(
+                            address.lastInteraction
+                          ).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-
-                {analysisResult.relatedAddresses?.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
-                    <p>未发现明显的关联地址</p>
-                    <p className="text-sm">该地址的交易模式相对独立</p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+
+              {analysisResult.relatedAddresses?.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <p>未发现明显的关联地址</p>
+                  <p className="text-sm">该地址的交易模式相对独立</p>
+                </div>
+              )}
+            </CardContent>
 
             {/* 分析时间 */}
             <div className="text-sm text-gray-500 text-center">

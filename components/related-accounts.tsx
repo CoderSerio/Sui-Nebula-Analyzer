@@ -60,21 +60,56 @@ export default function RelatedAccounts() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/all-relationships?limit=50`);
+      // 直接构造Nebula查询语句
+      const query = `USE sui_analysis; MATCH (a:wallet)-[r:related_to]-(b:wallet) RETURN a.wallet.address AS addr1, b.wallet.address AS addr2, r.relationship_score AS score, r.common_transactions AS common_tx LIMIT 50`;
+
+      const response = await fetch("/api/execute", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query }),
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch related accounts");
       }
 
-      const result: RelatedAccountsResponse = await response.json();
+      const result = await response.json();
 
-      if (result.error) {
-        setError(result.error);
+      if (!result.success) {
+        setError(result.error || "Query failed");
         return;
       }
 
+      // 处理Nebula返回的数据格式
+      const relationships: RelatedAccount[] = [];
+      const data = result.data.data;
+
+      if (
+        data &&
+        data.addr1 &&
+        data.addr2 &&
+        Array.isArray(data.addr1) &&
+        Array.isArray(data.addr2)
+      ) {
+        for (let i = 0; i < data.addr1.length; i++) {
+          relationships.push({
+            addr1: data.addr1[i],
+            addr2: data.addr2[i],
+            relationshipScore: data.score?.[i] || 0,
+            commonTransactions: data.common_tx?.[i] || 0,
+            amount: 0,
+            type: "unknown",
+          });
+        }
+      }
+
+      // 按关联强度排序
+      relationships.sort((a, b) => b.relationshipScore - a.relationshipScore);
+
       // 过滤数据根据最小分数
-      const filteredData = result.relationships.filter(
+      const filteredData = relationships.filter(
         (account) => account.relationshipScore >= minScore
       );
 
@@ -125,6 +160,102 @@ export default function RelatedAccounts() {
     if (score >= 0.4) return "弱关联";
     return "低关联";
   };
+
+  const tableColumns = [
+    {
+      key: "sendFrom",
+      label: "来源",
+      render: (account: any) => (
+        <div className="flex items-center gap-2">
+          <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+            {formatAddress(account.addr1)}
+          </code>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => copyAddress(account.addr1)}
+            className="h-6 w-6 p-0"
+          >
+            <Copy className="h-3 w-3" />
+          </Button>
+        </div>
+      ),
+    },
+    {
+      key: "accessTo",
+      label: "去向",
+      render: (account: any) => (
+        <div className="flex items-center gap-2">
+          <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+            {formatAddress(account.addr2)}
+          </code>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => copyAddress(account.addr2)}
+            className="h-6 w-6 p-0"
+          >
+            <Copy className="h-3 w-3" />
+          </Button>
+        </div>
+      ),
+    },
+    {
+      key: "strength",
+      label: "关联强度",
+      render: (account: any) => (
+        <>
+          <Badge className={getScoreBadgeColor(account.relationshipScore)}>
+            {getScoreLabel(account.relationshipScore)}
+          </Badge>
+          <div className="text-xs text-gray-500 mt-1">
+            {account.relationshipScore.toFixed(3)}
+          </div>
+        </>
+      ),
+    },
+    {
+      key: "transactions",
+      label: "共同交易",
+      render: (account: any) => (
+        <>
+          <div className="text-sm font-medium">
+            {account.commonTransactions}
+          </div>
+          {account.amount > 0 && (
+            <div className="text-xs text-gray-500">
+              {account.amount.toFixed(2)} SUI
+            </div>
+          )}
+        </>
+      ),
+    },
+    // {
+    //   key: "txCount",
+    //   label: "交易次数",
+    //   render: (account: any) => (
+    //     <div className="space-y-1 text-xs">
+    //       <div>共同交易: {account.commonTransactions}</div>
+    //       <div>总金额: {account.amount.toFixed(2)} SUI</div>
+    //     </div>
+    //   ),
+    // },
+    // {
+    //   key: "balance",
+    //   label: "账户余额",
+    //   render: (account: any) => (
+    //     <div className="space-y-1 text-xs">
+    //       <div>关联强度: {account.relationshipScore.toFixed(3)}</div>
+    //       <div>类型: {account.type}</div>
+    //     </div>
+    //   ),
+    // },
+    // {
+    //   key: "type",
+    //   label: "关联类型",
+    //   render: (account: any) => <Badge variant="outline">{account.type}</Badge>,
+    // },
+  ] as const;
 
   return (
     <Card>
@@ -198,12 +329,9 @@ export default function RelatedAccounts() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>账户地址对</TableHead>
-                    <TableHead>关联强度</TableHead>
-                    <TableHead>共同交易</TableHead>
-                    <TableHead>交易次数</TableHead>
-                    <TableHead>账户余额</TableHead>
-                    <TableHead>关联类型</TableHead>
+                    {tableColumns.map((column) => (
+                      <TableHead key={column.key}>{column.label}</TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -211,75 +339,11 @@ export default function RelatedAccounts() {
                     <TableRow
                       key={`${account.addr1}-${account.addr2}-${index}`}
                     >
-                      <TableCell>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {formatAddress(account.addr1)}
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyAddress(account.addr1)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                              {formatAddress(account.addr2)}
-                            </code>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyAddress(account.addr2)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={getScoreBadgeColor(
-                            account.relationshipScore
-                          )}
-                        >
-                          {getScoreLabel(account.relationshipScore)}
-                        </Badge>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {account.relationshipScore.toFixed(3)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium">
-                          {account.commonTransactions}
-                        </div>
-                        {account.amount > 0 && (
-                          <div className="text-xs text-gray-500">
-                            {account.amount.toFixed(2)} SUI
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-xs">
-                          <div>共同交易: {account.commonTransactions}</div>
-                          <div>总金额: {account.amount.toFixed(2)} SUI</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 text-xs">
-                          <div>
-                            关联强度: {account.relationshipScore.toFixed(3)}
-                          </div>
-                          <div>类型: {account.type}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{account.type}</Badge>
-                      </TableCell>
+                      {tableColumns.map((column) => (
+                        <TableCell key={column.key}>
+                          {column.render(account)}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
                 </TableBody>

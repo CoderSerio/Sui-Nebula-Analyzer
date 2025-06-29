@@ -16,7 +16,6 @@ import { Loader2, Search } from "lucide-react";
 import TransactionGraph from "@/components/transaction-graph";
 import AddressAnalysis from "@/components/address-analysis";
 import RelatedAccounts from "@/components/related-accounts";
-import DataCollection from "@/components/data-collection";
 
 export default function SuiNebulaAnalyzer() {
   const [loading, setLoading] = useState(false);
@@ -59,14 +58,14 @@ export default function SuiNebulaAnalyzer() {
                 onChange={(e) => setSearchAddress(e.target.value)}
                 className="flex-1"
               />
-              <Button onClick={handleSearch} disabled={loading}>
+              {/* <Button onClick={handleSearch} disabled={loading}>
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : (
                   <Search className="h-4 w-4 mr-2" />
                 )}
                 分析
-              </Button>
+              </Button> */}
             </div>
           </CardContent>
         </Card>
