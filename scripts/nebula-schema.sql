@@ -15,16 +15,20 @@ CREATE TAG IF NOT EXISTS wallet (
   last_seen datetime,
   transaction_count int DEFAULT 0,
   total_amount double DEFAULT 0.0,
-  is_contract bool DEFAULT false
+  is_contract bool DEFAULT false,
+  sui_balance double DEFAULT 0.0,
+  owned_objects_count int DEFAULT 0,
+  last_activity datetime
 );
 
 -- 创建边类型（交易关系）
 CREATE EDGE IF NOT EXISTS transaction (
   amount double NOT NULL,
-  timestamp datetime NOT NULL,
+  tx_timestamp datetime NOT NULL,
   tx_hash string NOT NULL,
   gas_used int DEFAULT 0,
-  success bool DEFAULT true
+  success bool DEFAULT true,
+  transaction_type string DEFAULT "unknown"
 );
 
 -- 创建关联关系边
@@ -34,10 +38,6 @@ CREATE EDGE IF NOT EXISTS related_to (
   total_amount double DEFAULT 0.0,
   first_interaction datetime,
   last_interaction datetime,
-  relationship_type string DEFAULT "unknown"
+  relationship_type string DEFAULT "unknown",
+  avg_gas_used double DEFAULT 0.0
 );
-
--- 创建索引以提高查询性能
--- CREATE TAG INDEX IF NOT EXISTS wallet_address_index ON wallet(address);
--- CREATE EDGE INDEX IF NOT EXISTS transaction_timestamp_index ON transaction(timestamp);
--- CREATE EDGE INDEX IF NOT EXISTS related_score_index ON related_to(relationship_score);

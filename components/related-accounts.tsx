@@ -360,12 +360,12 @@ export default function RelatedAccounts() {
 
   // 格式化时间函数
   const formatNebulaDate = (dateObj: any) => {
-    if (!dateObj || typeof dateObj !== "object") return "N/A";
+    if (!dateObj || typeof dateObj !== "object") return "--";
 
     try {
       // NebulaGraph 返回的时间格式：{year, month, day, hour, minute, sec, microsec}
       const { year, month, day, hour, minute, sec } = dateObj;
-      if (!year || !month || !day) return "N/A";
+      if (!year || !month || !day) return "--";
 
       const date = new Date(
         year,
@@ -381,13 +381,13 @@ export default function RelatedAccounts() {
         day: "2-digit",
       });
     } catch (error) {
-      return "N/A";
+      return "--";
     }
   };
 
   // 格式化Gas费用
   const formatGas = (gas: number) => {
-    if (!gas || gas === 0) return "N/A";
+    if (!gas || gas === 0) return "--";
 
     if (gas >= 1000000) {
       return `${(gas / 1000000).toFixed(1)}M`;
@@ -427,7 +427,7 @@ export default function RelatedAccounts() {
               : "--"}
           </div>
           <div className="text-gray-500">
-            对象: {account.objectCount > 0 ? account.objectCount : "N/A"}
+            对象: {account.objectCount > 0 ? account.objectCount : "--"}
           </div>
           {account.isContract && (
             <Badge variant="outline" className="text-xs">
@@ -458,7 +458,7 @@ export default function RelatedAccounts() {
             活跃度:{" "}
             {account.activityScore
               ? `${(account.activityScore * 100).toFixed(0)}%`
-              : "N/A"}
+              : "--"}
           </div>
         </div>
       ),
